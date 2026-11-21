@@ -50,8 +50,8 @@ html, body {
 .site .name { font-weight: 600; }
 .site .meta { color: var(--muted); font-size: 12px; }
 
-/* Town names on the regional view. */
-.town-label {
+/* Place names drawn on top of the map. */
+.place-label {
   background: none;
   border: none;
   text-align: center;
@@ -60,7 +60,7 @@ html, body {
   font-family: "Inter", sans-serif;
   font-size: 12px;
   font-weight: 500;
-  letter-spacing: 0.01em;
+  letter-spacing: -0.01em;
   color: #4a4a4a;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -68,11 +68,15 @@ html, body {
   text-shadow: 0 0 1px #fff, 0 0 3px #fff, 0 0 5px #fff;
   pointer-events: none;
 }
-.town-label.major {
+.place-label.major {
   font-size: 15px;
   font-weight: 700;
-  letter-spacing: 0.02em;
   color: #1a1a1a;
+}
+.place-label.hood {
+  font-size: 11px;
+  font-weight: 500;
+  color: #6b6b6b;
 }
 
 /* Leave the bottom free for the future year slider. */

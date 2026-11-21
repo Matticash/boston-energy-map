@@ -13,7 +13,9 @@ const STUDY_AREA = L.latLngBounds(
 
 const map = L.map("map", {
   zoomControl: false,
-  zoomSnap: 0.25, // lets the study area fill the screen more tightly
+  // Whole-number zoom levels only: in-between levels stretch the map images
+  // and make them blurry.
+  zoomSnap: 1,
   maxZoom: 16,
   maxBounds: STUDY_AREA.pad(0.05),
   maxBoundsViscosity: 1.0
@@ -25,18 +27,12 @@ map.setMinZoom(map.getZoom()); // can't zoom out past the whole study area
 const ATTRIBUTION = "Tiles &copy; Esri &mdash; Esri, HERE, Garmin, &copy; OpenStreetMap contributors";
 const ESRI = "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/";
 
-// Light grayscale base map with no labels, so we control which names show.
+// Light grayscale base map with no labels. All place names are drawn by us
+// (below) as real text, so they stay sharp at every zoom level.
 L.tileLayer(ESRI + "World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}", {
   attribution: ATTRIBUTION,
   maxZoom: 16
 }).addTo(map);
-
-// Detailed street and neighborhood labels, only once zoomed in.
-const DETAIL_ZOOM = 12;
-const detailLabels = L.tileLayer(ESRI + "World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}", {
-  maxZoom: 16,
-  pane: "shadowPane" // draws above the mask and the data dots
-});
 
 // Fade everything outside the study area.
 const WORLD = [[-90, -180], [-90, 180], [90, 180], [90, -180]];
@@ -58,59 +54,90 @@ L.rectangle(STUDY_AREA, {
   interactive: false
 }).addTo(map);
 
-// Big towns, labeled at the regional zoom levels.
-// "crowded" towns sit close to Boston, so they only appear once zoomed in a bit.
-const CROWDED_ZOOM = 10;
-const TOWNS = [
-  { name: "Boston", lat: 42.3601, lng: -71.0589, major: true },
-  { name: "Cambridge", crowded: true, lat: 42.3736, lng: -71.1097 },
-  { name: "Quincy", lat: 42.2529, lng: -71.0023 },
-  { name: "Newton", crowded: true, lat: 42.3370, lng: -71.2092 },
-  { name: "Waltham", crowded: true, lat: 42.3765, lng: -71.2356 },
-  { name: "Woburn", crowded: true, lat: 42.4793, lng: -71.1523 },
-  { name: "Lynn", crowded: true, lat: 42.4668, lng: -70.9495 },
-  { name: "Salem", lat: 42.5195, lng: -70.8967 },
-  { name: "Gloucester", lat: 42.6159, lng: -70.6620 },
-  { name: "Lowell", lat: 42.6334, lng: -71.3162 },
-  { name: "Lawrence", lat: 42.7070, lng: -71.1631 },
-  { name: "Haverhill", lat: 42.7762, lng: -71.0773 },
-  { name: "Framingham", lat: 42.2793, lng: -71.4162 },
-  { name: "Marlborough", lat: 42.3459, lng: -71.5523 },
-  { name: "Brockton", lat: 42.0834, lng: -71.0184 },
-  { name: "Plymouth", lat: 41.9584, lng: -70.6673 },
-  { name: "Attleboro", lat: 41.9445, lng: -71.2856 }
+// Place names. Each one shows between its minZoom and maxZoom, so the map
+// never gets crowded: big towns first, then inner cities, then neighborhoods.
+//   tier "major": Boston itself
+//   tier "town":  cities and towns
+//   tier "hood":  Boston neighborhoods
+const PLACES = [
+  { name: "Boston", tier: "major", lat: 42.3601, lng: -71.0589, maxZoom: 12 },
+
+  // Regional towns (always shown)
+  { name: "Quincy", tier: "town", lat: 42.2529, lng: -71.0023 },
+  { name: "Salem", tier: "town", lat: 42.5195, lng: -70.8967 },
+  { name: "Gloucester", tier: "town", lat: 42.6159, lng: -70.6620 },
+  { name: "Lowell", tier: "town", lat: 42.6334, lng: -71.3162 },
+  { name: "Lawrence", tier: "town", lat: 42.7070, lng: -71.1631 },
+  { name: "Haverhill", tier: "town", lat: 42.7762, lng: -71.0773 },
+  { name: "Framingham", tier: "town", lat: 42.2793, lng: -71.4162 },
+  { name: "Marlborough", tier: "town", lat: 42.3459, lng: -71.5523 },
+  { name: "Brockton", tier: "town", lat: 42.0834, lng: -71.0184 },
+  { name: "Plymouth", tier: "town", lat: 41.9584, lng: -70.6673 },
+  { name: "Attleboro", tier: "town", lat: 41.9445, lng: -71.2856 },
+
+  // Close to Boston: appear after one zoom step
+  { name: "Cambridge", tier: "town", lat: 42.3736, lng: -71.1097, minZoom: 10 },
+  { name: "Newton", tier: "town", lat: 42.3370, lng: -71.2092, minZoom: 10 },
+  { name: "Waltham", tier: "town", lat: 42.3765, lng: -71.2356, minZoom: 10 },
+  { name: "Woburn", tier: "town", lat: 42.4793, lng: -71.1523, minZoom: 10 },
+  { name: "Lynn", tier: "town", lat: 42.4668, lng: -70.9495, minZoom: 10 },
+
+  // Inner ring: appear once zoomed in further
+  { name: "Somerville", tier: "town", lat: 42.3876, lng: -71.0995, minZoom: 12 },
+  { name: "Brookline", tier: "town", lat: 42.3318, lng: -71.1212, minZoom: 12 },
+  { name: "Watertown", tier: "town", lat: 42.3709, lng: -71.1828, minZoom: 12 },
+  { name: "Medford", tier: "town", lat: 42.4184, lng: -71.1062, minZoom: 12 },
+  { name: "Malden", tier: "town", lat: 42.4251, lng: -71.0662, minZoom: 12 },
+  { name: "Everett", tier: "town", lat: 42.4084, lng: -71.0537, minZoom: 12 },
+  { name: "Chelsea", tier: "town", lat: 42.3918, lng: -71.0328, minZoom: 12 },
+  { name: "Revere", tier: "town", lat: 42.4084, lng: -71.0120, minZoom: 12 },
+
+  // Boston neighborhoods: replace the "Boston" label up close
+  { name: "Back Bay", tier: "hood", lat: 42.3503, lng: -71.0810, minZoom: 13 },
+  { name: "Beacon Hill", tier: "hood", lat: 42.3588, lng: -71.0707, minZoom: 13 },
+  { name: "North End", tier: "hood", lat: 42.3647, lng: -71.0542, minZoom: 13 },
+  { name: "Downtown", tier: "hood", lat: 42.3555, lng: -71.0605, minZoom: 13 },
+  { name: "South End", tier: "hood", lat: 42.3388, lng: -71.0765, minZoom: 13 },
+  { name: "Seaport", tier: "hood", lat: 42.3519, lng: -71.0446, minZoom: 13 },
+  { name: "South Boston", tier: "hood", lat: 42.3350, lng: -71.0400, minZoom: 13 },
+  { name: "Charlestown", tier: "hood", lat: 42.3782, lng: -71.0602, minZoom: 13 },
+  { name: "East Boston", tier: "hood", lat: 42.3702, lng: -71.0389, minZoom: 13 },
+  { name: "Fenway", tier: "hood", lat: 42.3429, lng: -71.1003, minZoom: 13 },
+  { name: "Roxbury", tier: "hood", lat: 42.3152, lng: -71.0914, minZoom: 13 },
+  { name: "Dorchester", tier: "hood", lat: 42.3016, lng: -71.0676, minZoom: 13 },
+  { name: "Jamaica Plain", tier: "hood", lat: 42.3097, lng: -71.1151, minZoom: 13 },
+  { name: "Allston", tier: "hood", lat: 42.3539, lng: -71.1337, minZoom: 13 },
+  { name: "Brighton", tier: "hood", lat: 42.3464, lng: -71.1627, minZoom: 13 },
+  { name: "Mattapan", tier: "hood", lat: 42.2771, lng: -71.0914, minZoom: 13 },
+  { name: "Roslindale", tier: "hood", lat: 42.2832, lng: -71.1270, minZoom: 13 },
+  { name: "West Roxbury", tier: "hood", lat: 42.2793, lng: -71.1595, minZoom: 13 },
+  { name: "Hyde Park", tier: "hood", lat: 42.2557, lng: -71.1245, minZoom: 13 }
 ];
 
 // Fixed-width, centered box keeps text on whole pixels so it renders sharp.
 const LABEL_W = 160, LABEL_H = 20;
-const townMarkers = TOWNS.map((t) => ({
-  town: t,
-  marker: L.marker([t.lat, t.lng], {
+const placeMarkers = PLACES.map((p) => ({
+  place: p,
+  marker: L.marker([p.lat, p.lng], {
     interactive: false,
     icon: L.divIcon({
-      className: "town-label" + (t.major ? " major" : ""),
-      html: t.name,
+      className: "place-label " + p.tier,
+      html: p.name,
       iconSize: [LABEL_W, LABEL_H],
       iconAnchor: [LABEL_W / 2, LABEL_H / 2]
     })
   })
 }));
-const townLabels = L.layerGroup();
+const placeLabels = L.layerGroup().addTo(map);
 
-// Swap between big-town labels (zoomed out) and detailed labels (zoomed in).
 function updateLabels() {
   const z = map.getZoom();
-  if (z >= DETAIL_ZOOM) {
-    map.removeLayer(townLabels);
-    detailLabels.addTo(map);
-    return;
+  placeLabels.clearLayers();
+  for (const { place, marker } of placeMarkers) {
+    const min = place.minZoom ?? 0;
+    const max = place.maxZoom ?? 99;
+    if (z >= min && z <= max) placeLabels.addLayer(marker);
   }
-  map.removeLayer(detailLabels);
-  townLabels.clearLayers();
-  for (const { town, marker } of townMarkers) {
-    if (!town.crowded || z >= CROWDED_ZOOM) townLabels.addLayer(marker);
-  }
-  townLabels.addTo(map);
 }
 map.on("zoomend", updateLabels);
 updateLabels();
