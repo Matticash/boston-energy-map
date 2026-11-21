@@ -59,14 +59,16 @@ L.rectangle(STUDY_AREA, {
 }).addTo(map);
 
 // Big towns, labeled at the regional zoom levels.
+// "crowded" towns sit close to Boston, so they only appear once zoomed in a bit.
+const CROWDED_ZOOM = 10;
 const TOWNS = [
   { name: "Boston", lat: 42.3601, lng: -71.0589, major: true },
-  { name: "Cambridge", lat: 42.3736, lng: -71.1097 },
+  { name: "Cambridge", crowded: true, lat: 42.3736, lng: -71.1097 },
   { name: "Quincy", lat: 42.2529, lng: -71.0023 },
-  { name: "Newton", lat: 42.3370, lng: -71.2092 },
-  { name: "Waltham", lat: 42.3765, lng: -71.2356 },
-  { name: "Woburn", lat: 42.4793, lng: -71.1523 },
-  { name: "Lynn", lat: 42.4668, lng: -70.9495 },
+  { name: "Newton", crowded: true, lat: 42.3370, lng: -71.2092 },
+  { name: "Waltham", crowded: true, lat: 42.3765, lng: -71.2356 },
+  { name: "Woburn", crowded: true, lat: 42.4793, lng: -71.1523 },
+  { name: "Lynn", crowded: true, lat: 42.4668, lng: -70.9495 },
   { name: "Salem", lat: 42.5195, lng: -70.8967 },
   { name: "Gloucester", lat: 42.6159, lng: -70.6620 },
   { name: "Lowell", lat: 42.6334, lng: -71.3162 },
@@ -79,28 +81,36 @@ const TOWNS = [
   { name: "Attleboro", lat: 41.9445, lng: -71.2856 }
 ];
 
-const townLabels = L.layerGroup(
-  TOWNS.map((t) =>
-    L.marker([t.lat, t.lng], {
-      interactive: false,
-      icon: L.divIcon({
-        className: "town-label" + (t.major ? " major" : ""),
-        html: `<span>${t.name}</span>`,
-        iconSize: null
-      })
+// Fixed-width, centered box keeps text on whole pixels so it renders sharp.
+const LABEL_W = 160, LABEL_H = 20;
+const townMarkers = TOWNS.map((t) => ({
+  town: t,
+  marker: L.marker([t.lat, t.lng], {
+    interactive: false,
+    icon: L.divIcon({
+      className: "town-label" + (t.major ? " major" : ""),
+      html: t.name,
+      iconSize: [LABEL_W, LABEL_H],
+      iconAnchor: [LABEL_W / 2, LABEL_H / 2]
     })
-  )
-);
+  })
+}));
+const townLabels = L.layerGroup();
 
 // Swap between big-town labels (zoomed out) and detailed labels (zoomed in).
 function updateLabels() {
-  if (map.getZoom() >= DETAIL_ZOOM) {
+  const z = map.getZoom();
+  if (z >= DETAIL_ZOOM) {
     map.removeLayer(townLabels);
     detailLabels.addTo(map);
-  } else {
-    map.removeLayer(detailLabels);
-    townLabels.addTo(map);
+    return;
   }
+  map.removeLayer(detailLabels);
+  townLabels.clearLayers();
+  for (const { town, marker } of townMarkers) {
+    if (!town.crowded || z >= CROWDED_ZOOM) townLabels.addLayer(marker);
+  }
+  townLabels.addTo(map);
 }
 map.on("zoomend", updateLabels);
 updateLabels();
