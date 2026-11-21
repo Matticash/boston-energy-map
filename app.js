@@ -2,7 +2,9 @@
 // highlights any site inside it.
 
 const BOSTON = [42.3601, -71.0589];
-const RADIUS_METERS = 4000; // size of the mouse circle
+// Size of the mouse circle, in screen pixels. It stays this size on screen at
+// every zoom, so zooming in makes it cover a smaller patch of ground.
+const CURSOR_RADIUS_PX = 12;
 
 // Study area: Greater Boston, stopping just north of Providence, RI.
 // South edge sits above Pawtucket so Providence stays out.
@@ -152,12 +154,12 @@ const markers = (window.SITES || []).map((site) => {
 });
 
 // The circle that follows the mouse.
-const cursor = L.circle(BOSTON, {
-  radius: RADIUS_METERS,
+const cursor = L.circleMarker(BOSTON, {
+  radius: CURSOR_RADIUS_PX,
   color: "#1f8a5b",
   weight: 1,
   fillColor: "#1f8a5b",
-  fillOpacity: 0.08,
+  fillOpacity: 0.12,
   interactive: false
 });
 
@@ -167,9 +169,10 @@ function update(latlng) {
   cursor.setLatLng(latlng);
   if (!map.hasLayer(cursor)) cursor.addTo(map);
 
+  const here = map.latLngToContainerPoint(latlng);
   const inRange = [];
   for (const { site, marker } of markers) {
-    const hit = map.distance(latlng, [site.lat, site.lng]) <= RADIUS_METERS;
+    const hit = here.distanceTo(map.latLngToContainerPoint([site.lat, site.lng])) <= CURSOR_RADIUS_PX;
     marker.setStyle(hit ? STYLE_HOT : STYLE_IDLE);
     if (hit) inRange.push(site);
   }
