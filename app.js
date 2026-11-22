@@ -144,16 +144,70 @@ function updateLabels() {
 map.on("zoomend", updateLabels);
 updateLabels();
 
-const STYLE_IDLE = { radius: 6, color: "#555", weight: 1, fillColor: "#999", fillOpacity: 0.8 };
-const STYLE_HOT = { radius: 9, color: "#1f8a5b", weight: 2, fillColor: "#2ecc71", fillOpacity: 1 };
+// ---- Energy sites -------------------------------------------------------
 
-// Draw each site as a dot.
-const markers = (window.SITES || []).map((site) => {
-  const marker = L.circleMarker([site.lat, site.lng], STYLE_IDLE).addTo(map);
-  return { site, marker };
+// One color per source type. Storage (batteries) gets its own color because
+// it stores power rather than making it.
+const TYPES = {
+  "solar":             { color: "#e0a100", label: "Solar" },
+  "wind":              { color: "#2f7fc1", label: "Wind" },
+  "offshore wind":     { color: "#2f7fc1", label: "Offshore wind" },
+  "hydro":             { color: "#14918f", label: "Hydro" },
+  "hydro (imported)":  { color: "#14918f", label: "Imported hydro" },
+  "biomass":           { color: "#6b8e23", label: "Biomass" },
+  "landfill gas":      { color: "#8d6e63", label: "Landfill gas" },
+  "battery":           { color: "#8e44ad", label: "Battery storage" }
+};
+const typeOf = (t) => TYPES[t] || { color: "#777", label: t };
+
+// Dot size grows with capacity (square root, so big sites don't swamp the map).
+const dotRadius = (mw) => Math.min(14, 3 + 1.6 * Math.sqrt(mw));
+
+function dotStyle(site, hot) {
+  const c = typeOf(site.type).color;
+  const proposed = site.stage === "proposed";
+  return {
+    radius: dotRadius(site.mw) + (hot ? 2 : 0),
+    color: hot ? "#111" : c,
+    weight: hot ? 2 : 1.5,
+    fillColor: c,
+    fillOpacity: proposed ? 0 : (hot ? 1 : 0.75),
+    dashArray: proposed ? "3 2" : null
+  };
+}
+
+// Biggest first, so small dots draw on top and stay hoverable.
+const sites = (window.SITES || []).slice().sort((a, b) => b.mw - a.mw);
+const markers = sites.map((site) => {
+  const marker = L.circleMarker([site.lat, site.lng], dotStyle(site, false)).addTo(map);
+  return { site, marker, hot: false };
 });
 
-// The circle that follows the mouse.
+// Sources outside the map area: a badge on the edge pointing toward them.
+const outside = (window.OUTSIDE || []).map((src) => {
+  const marker = L.marker([src.badgeLat, src.badgeLng], {
+    interactive: false,
+    icon: L.divIcon({
+      className: "edge-badge",
+      html: `<span style="border-color:${typeOf(src.type).color}">${src.arrow} ${src.name}</span>`,
+      iconSize: [240, 24],
+      iconAnchor: [120, 12]
+    })
+  }).addTo(map);
+  return { src, marker };
+});
+
+// ---- Legend -------------------------------------------------------------
+
+const legendTypes = ["solar", "wind", "hydro", "biomass", "landfill gas", "battery"];
+document.getElementById("legend").innerHTML =
+  legendTypes.map((t) =>
+    `<span class="key"><i style="background:${typeOf(t).color}"></i>${typeOf(t).label}</span>`
+  ).join("") +
+  `<span class="key"><i class="hollow"></i>Planned</span>`;
+
+// ---- Mouse circle -------------------------------------------------------
+
 const cursor = L.circleMarker(BOSTON, {
   radius: CURSOR_RADIUS_PX,
   color: "#1f8a5b",
@@ -170,29 +224,72 @@ function update(latlng) {
   if (!map.hasLayer(cursor)) cursor.addTo(map);
 
   const here = map.latLngToContainerPoint(latlng);
+  const near = (lat, lng, extra = 0) =>
+    here.distanceTo(map.latLngToContainerPoint([lat, lng])) <= CURSOR_RADIUS_PX + extra;
+
   const inRange = [];
-  for (const { site, marker } of markers) {
-    const hit = here.distanceTo(map.latLngToContainerPoint([site.lat, site.lng])) <= CURSOR_RADIUS_PX;
-    marker.setStyle(hit ? STYLE_HOT : STYLE_IDLE);
-    if (hit) inRange.push(site);
+  for (const m of markers) {
+    const hit = near(m.site.lat, m.site.lng, dotRadius(m.site.mw));
+    if (hit !== m.hot) { m.marker.setStyle(dotStyle(m.site, hit)); m.hot = hit; }
+    if (hit) inRange.push(m.site);
   }
-  renderPanel(inRange);
+  const outsideHit = outside.filter(({ src }) => near(src.badgeLat, src.badgeLng, 40)).map((o) => o.src);
+  renderPanel(inRange, outsideHit);
 }
 
-function renderPanel(sites) {
-  if (sites.length === 0) {
+const fmtMW = (mw) => (mw >= 10 ? Math.round(mw) : mw.toFixed(1)) + " MW";
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function renderPanel(inRange, outsideHit = []) {
+  if (inRange.length === 0 && outsideHit.length === 0) {
     nearbyEl.innerHTML = '<p class="empty">Nothing in range.</p>';
     return;
   }
-  nearbyEl.innerHTML = sites
-    .map((s) => `<div class="site"><div class="name">${s.name}</div><div class="meta">${s.type}</div></div>`)
-    .join("");
+  let html = "";
+
+  for (const src of outsideHit) {
+    html += `<div class="site outside">
+      <div class="name">${esc(src.name)}</div>
+      <div class="meta">${esc(typeOf(src.type).label)} · ${fmtMW(src.mw)} · online ${src.year}</div>
+      <div class="where">${esc(src.where)}</div>
+      <div class="note">${esc(src.note)}</div>
+    </div>`;
+  }
+
+  if (inRange.length) {
+    // Totals by type.
+    const totals = {};
+    for (const s of inRange) {
+      const t = (totals[s.type] ||= { n: 0, mw: 0 });
+      t.n += 1; t.mw += s.mw;
+    }
+    html += '<div class="totals">' + Object.entries(totals)
+      .sort((a, b) => b[1].mw - a[1].mw)
+      .map(([t, v]) => `<div class="row"><i style="background:${typeOf(t).color}"></i>
+        <span>${typeOf(t).label}</span><span class="n">${v.n} site${v.n > 1 ? "s" : ""}</span>
+        <span class="mw">${fmtMW(v.mw)}</span></div>`).join("") + "</div>";
+
+    // The biggest few, by name.
+    const top = inRange.slice(0, 5);
+    html += top.map((s) => `<div class="site">
+      <div class="name">${esc(s.name)}</div>
+      <div class="meta">${typeOf(s.type).label} · ${fmtMW(s.mw)} · ${esc(s.city)}, ${s.state} ·
+        ${s.stage === "proposed" ? "planned for " + s.year : "since " + s.year}</div>
+    </div>`).join("");
+    if (inRange.length > top.length) {
+      html += `<p class="more">+ ${inRange.length - top.length} smaller sites</p>`;
+    }
+  }
+  nearbyEl.innerHTML = html;
 }
 
-map.on("mousemove", (e) => update(e.latlng));
+let lastLatLng = null;
+map.on("mousemove", (e) => { lastLatLng = e.latlng; update(e.latlng); });
+// Re-check after zooming, since the circle now covers a different patch of ground.
+map.on("zoomend", () => { if (lastLatLng && map.hasLayer(cursor)) update(lastLatLng); });
 map.on("mouseout", () => {
   map.removeLayer(cursor);
-  markers.forEach(({ marker }) => marker.setStyle(STYLE_IDLE));
+  markers.forEach((m) => { if (m.hot) { m.marker.setStyle(dotStyle(m.site, false)); m.hot = false; } });
   renderPanel([]);
 });
 // Tap support for phones.
