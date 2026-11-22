@@ -10,7 +10,7 @@ const CURSOR_RADIUS_PX = 12;
 // South edge sits above Pawtucket so Providence stays out.
 const STUDY_AREA = L.latLngBounds(
   [41.89, -71.65], // southwest corner (above Pawtucket, east of Worcester)
-  [42.88, -70.45]  // northeast corner (past Haverhill and Cape Ann)
+  [42.93, -70.45]  // northeast corner (past Seabrook, NH and Cape Ann)
 );
 
 const map = L.map("map", {
@@ -154,6 +154,8 @@ const TYPES = {
   "offshore wind":     { color: "#2f7fc1", label: "Offshore wind" },
   "hydro":             { color: "#14918f", label: "Hydro" },
   "hydro (imported)":  { color: "#14918f", label: "Imported hydro" },
+  "nuclear":           { color: "#c2185b", label: "Nuclear" },
+  "geothermal":        { color: "#b5542b", label: "Geothermal" },
   "biomass":           { color: "#6b8e23", label: "Biomass" },
   "landfill gas":      { color: "#8d6e63", label: "Landfill gas" },
   "battery":           { color: "#8e44ad", label: "Battery storage" }
@@ -161,23 +163,26 @@ const TYPES = {
 const typeOf = (t) => TYPES[t] || { color: "#777", label: t };
 
 // Dot size grows with capacity (square root, so big sites don't swamp the map).
-const dotRadius = (mw) => Math.min(14, 3 + 1.6 * Math.sqrt(mw));
+// Geothermal heats buildings and has no MW figure, so it gets a fixed size.
+const dotRadius = (mw) => (mw == null ? 6 : Math.min(14, 3 + 1.6 * Math.sqrt(mw)));
 
 function dotStyle(site, hot) {
   const c = typeOf(site.type).color;
   const proposed = site.stage === "proposed";
+  const retired = site.stage === "retired";
   return {
     radius: dotRadius(site.mw) + (hot ? 2 : 0),
     color: hot ? "#111" : c,
-    weight: hot ? 2 : 1.5,
-    fillColor: c,
+    weight: hot ? 2 : (retired ? 2.5 : 1.5),
+    fillColor: retired ? "#bdbdbd" : c,
     fillOpacity: proposed ? 0 : (hot ? 1 : 0.75),
     dashArray: proposed ? "3 2" : null
   };
 }
 
 // Biggest first, so small dots draw on top and stay hoverable.
-const sites = (window.SITES || []).slice().sort((a, b) => b.mw - a.mw);
+const sites = [...(window.SITES || []), ...(window.EXTRA_SITES || [])]
+  .sort((a, b) => (b.mw ?? 0) - (a.mw ?? 0));
 const markers = sites.map((site) => {
   const marker = L.circleMarker([site.lat, site.lng], dotStyle(site, false)).addTo(map);
   return { site, marker, hot: false };
@@ -199,12 +204,13 @@ const outside = (window.OUTSIDE || []).map((src) => {
 
 // ---- Legend -------------------------------------------------------------
 
-const legendTypes = ["solar", "wind", "hydro", "biomass", "landfill gas", "battery"];
+const legendTypes = ["solar", "wind", "hydro", "nuclear", "geothermal", "biomass", "landfill gas", "battery"];
 document.getElementById("legend").innerHTML =
   legendTypes.map((t) =>
     `<span class="key"><i style="background:${typeOf(t).color}"></i>${typeOf(t).label}</span>`
   ).join("") +
-  `<span class="key"><i class="hollow"></i>Planned</span>`;
+  `<span class="key"><i class="hollow"></i>Planned</span>` +
+  `<span class="key"><i class="retired"></i>Shut down</span>`;
 
 // ---- Mouse circle -------------------------------------------------------
 
@@ -238,6 +244,13 @@ function update(latlng) {
 }
 
 const fmtMW = (mw) => (mw >= 10 ? Math.round(mw) : mw.toFixed(1)) + " MW";
+// Output for one site: MW for power plants, buildings for geothermal heat.
+const fmtOut = (s) => (s.mw == null ? `heats ~${s.buildings} buildings` : fmtMW(s.mw));
+function fmtWhen(s) {
+  if (s.stage === "retired") return `shut down ${s.retired}`;
+  if (s.stage === "proposed") return s.year ? `planned for ${s.year}` : "planned";
+  return `since ${s.year}`;
+}
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 function renderPanel(inRange, outsideHit = []) {
@@ -261,20 +274,21 @@ function renderPanel(inRange, outsideHit = []) {
     const totals = {};
     for (const s of inRange) {
       const t = (totals[s.type] ||= { n: 0, mw: 0 });
-      t.n += 1; t.mw += s.mw;
+      t.n += 1;
+      if (s.mw != null && s.stage !== "retired") t.mw += s.mw;
     }
     html += '<div class="totals">' + Object.entries(totals)
       .sort((a, b) => b[1].mw - a[1].mw)
       .map(([t, v]) => `<div class="row"><i style="background:${typeOf(t).color}"></i>
         <span>${typeOf(t).label}</span><span class="n">${v.n} site${v.n > 1 ? "s" : ""}</span>
-        <span class="mw">${fmtMW(v.mw)}</span></div>`).join("") + "</div>";
+        <span class="mw">${v.mw ? fmtMW(v.mw) : "–"}</span></div>`).join("") + "</div>";
 
     // The biggest few, by name.
     const top = inRange.slice(0, 5);
     html += top.map((s) => `<div class="site">
       <div class="name">${esc(s.name)}</div>
-      <div class="meta">${typeOf(s.type).label} · ${fmtMW(s.mw)} · ${esc(s.city)}, ${s.state} ·
-        ${s.stage === "proposed" ? "planned for " + s.year : "since " + s.year}</div>
+      <div class="meta">${typeOf(s.type).label} · ${fmtOut(s)} · ${esc(s.city)}, ${s.state} · ${fmtWhen(s)}</div>
+      ${s.note ? `<div class="note">${esc(s.note)}${s.approx ? " (Location approximate.)" : ""}</div>` : ""}
     </div>`).join("");
     if (inRange.length > top.length) {
       html += `<p class="more">+ ${inRange.length - top.length} smaller sites</p>`;

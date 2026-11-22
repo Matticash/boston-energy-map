@@ -70,6 +70,7 @@ html, body {
   flex: none;
 }
 #legend i.hollow { border: 1.5px dashed #777; background: none; width: 9px; height: 9px; }
+#legend i.retired { background: #bdbdbd; border: 2px solid #777; width: 9px; height: 9px; }
 
 /* Totals inside the mouse circle. */
 .totals { padding-bottom: 8px; }
