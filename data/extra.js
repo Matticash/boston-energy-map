@@ -51,5 +51,56 @@ window.EXTRA_SITES = [
     sources: [
       "https://www.utilitydive.com/news/boston-first-networked-geothermal-electrify-public-housing-national-grid/707237/"
     ]
+  },
+
+  // ---- Small sites near Boston (under 1 MW, so not in EIA-860) ----------
+  {
+    name: "Logan Airport solar (Massport)",
+    city: "East Boston", state: "MA",
+    type: "solar", stage: "operating", year: null,
+    mw: 0.97,
+    approx: true,
+    lat: 42.3656, lng: -71.0096,
+    note: "Seven arrays across the airport: Terminal A 277 kW, Terminal B garage 200 kW, Terminal C canopy 178 kW, Rental Car Center 121 kW, Terminal A satellite 93 kW, economy garage 81 kW, Terminal E solar glass 20 kW. Massport's sites make over 1,100 MWh a year in total.",
+    sources: [
+      "https://www.massport.com/environment/roadmap-to-net-zero/solar-photovoltaics"
+    ]
+  },
+  {
+    name: "Boston Dedham Commerce Park rooftop solar",
+    city: "Hyde Park (Boston)", state: "MA",
+    type: "solar", stage: "operating", year: 2013,
+    mw: 0.978,
+    approx: true,
+    lat: 42.2395, lng: -71.1335,
+    note: "Billed as Boston's largest rooftop array when it opened in 2013 (120,000 sq ft). Current status not confirmed since then.",
+    sources: [
+      "https://www.bostonplans.org/news-calendar/news-updates/2013/05/16/bostons-largest-rooftop-solar-array-debuts"
+    ]
+  },
+  {
+    name: "Hull Wind I",
+    city: "Hull", state: "MA",
+    type: "wind", stage: "retired", year: 2001, retired: 2024,
+    mw: 0.66,
+    approx: true,
+    lat: 42.3058, lng: -70.9201,
+    note: "The first commercial-scale wind turbine on the East Coast, at Windmill Point. Went offline after 2021 and was removed in February 2024.",
+    sources: [
+      "https://www.publicpower.org/periodical/article/operationally-challenged-hull-wind-ii-turbine-taken-down",
+      "https://masscivics.com/hull/"
+    ]
+  },
+  {
+    name: "Hull Wind II",
+    city: "Hull", state: "MA",
+    type: "wind", stage: "retired", year: 2006, retired: 2025,
+    mw: 1.8,
+    lat: 42.26111, lng: -70.85639,
+    note: "Town-owned turbine. Went offline after 2023 when replacement parts became obsolete, and had been demolished by December 2025. EIA lists it as retired.",
+    sources: [
+      "https://www.publicpower.org/periodical/article/operationally-challenged-hull-wind-ii-turbine-taken-down",
+      "https://www.eia.gov/electricity/data/eia860/"
+    ]
   }
 ];

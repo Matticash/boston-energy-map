@@ -243,13 +243,13 @@ function update(latlng) {
   renderPanel(inRange, outsideHit);
 }
 
-const fmtMW = (mw) => (mw >= 10 ? Math.round(mw) : mw.toFixed(1)) + " MW";
+const fmtMW = (mw) => (mw >= 10 ? Math.round(mw) : mw >= 1 ? mw.toFixed(1) : mw.toFixed(2)) + " MW";
 // Output for one site: MW for power plants, buildings for geothermal heat.
 const fmtOut = (s) => (s.mw == null ? `heats ~${s.buildings} buildings` : fmtMW(s.mw));
 function fmtWhen(s) {
   if (s.stage === "retired") return `shut down ${s.retired}`;
   if (s.stage === "proposed") return s.year ? `planned for ${s.year}` : "planned";
-  return `since ${s.year}`;
+  return s.year ? `since ${s.year}` : "operating";
 }
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
