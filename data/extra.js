@@ -21,10 +21,10 @@ window.EXTRA_SITES = [
     type: "nuclear", stage: "retired", year: 1972, retired: 2019,
     mw: 680,
     lat: 41.9447, lng: -70.5786,
-    note: "Massachusetts' only nuclear plant. Shut down May 31, 2019, and now being torn down; spent fuel is still stored on site.",
+    note: "Massachusetts' only nuclear plant. Shut down May 31, 2019, and now being decommissioned; spent fuel is still stored on site.",
     sources: [
-      "https://www.nrc.gov/info-finder/decommissioning/power-reactor/index/pilgrim-nuclear-power-station",
-      "https://www.mass.gov/info-details/pilgrim-nuclear-power-station"
+      "https://www.cbsnews.com/boston/news/pilgrim-nuclear-power-plant-plymouth-massachusetts",
+      "https://en.wikipedia.org/wiki/Pilgrim_Nuclear_Power_Plant"
     ]
   },
   {
@@ -34,7 +34,7 @@ window.EXTRA_SITES = [
     mw: null, buildings: 36,
     approx: true,
     lat: 42.2797, lng: -71.4155,
-    note: "First utility-run networked geothermal system in the US (Eversource). Shared underground pipes heat and cool about 36 buildings instead of gas. An expansion is waiting on state approval.",
+    note: "Eversource pilot, the first networked geothermal system built by a gas company. Shared underground pipes heat and cool 36 buildings (125 customer accounts) instead of gas.",
     sources: [
       "https://www.eversource.com/residential/about/transmission-distribution/projects/massachusetts-projects/geothermal-pilot-project",
       "https://www.wbur.org/news/2024/03/08/networked-geothermal-eversource-framingham-pilot-project-decarbonization"
@@ -47,7 +47,7 @@ window.EXTRA_SITES = [
     mw: null, buildings: 7,
     approx: true,
     lat: 42.2905, lng: -71.0865,
-    note: "National Grid pilot to replace an old gas boiler loop at 7 public housing buildings (129 apartments). Construction timing is unclear.",
+    note: "National Grid pilot to replace an aging gas boiler loop at 7 public housing buildings (129 apartments). Construction was planned for 2025; current status unconfirmed.",
     sources: [
       "https://www.utilitydive.com/news/boston-first-networked-geothermal-electrify-public-housing-national-grid/707237/"
     ]

@@ -5,16 +5,16 @@ window.OUTSIDE = [
   {
     name: "Vineyard Wind 1",
     type: "offshore wind",
-    mw: 806,
+    mw: 804,
     stage: "operating",
     year: 2026,
-    where: "About 95 miles south of Boston, in the ocean past Martha's Vineyard",
-    note: "62 turbines. Reached full operation Oct 29, 2026. Power is sold to Massachusetts utilities under 20-year contracts.",
+    where: "In the ocean about 15 miles south of Martha's Vineyard",
+    note: "62 turbines. Reached full operation Oct 29, 2026. Sells its power to National Grid, Eversource and Unitil under 20-year contracts.",
     arrow: "↓",
     badgeLat: 41.91, badgeLng: -70.55,
     sources: [
-      "https://www.windpowermonthly.com/article/1974945/vineyard-wind-reaches-full-commercial-operation",
-      "https://www.wbur.org/news/2026/11/06/vineyard-wind-fully-running-offshore-wind-massachusetts"
+      "https://www.wbur.org/news/2026/11/06/vineyard-wind-fully-running-offshore-wind-massachusetts",
+      "https://en.wikipedia.org/wiki/Vineyard_Wind"
     ]
   },
   {
@@ -23,13 +23,13 @@ window.OUTSIDE = [
     mw: 1200,
     stage: "operating",
     year: 2026,
-    where: "A 145-mile power line from the Québec border to Lewiston, Maine, about 130 miles north of Boston",
-    note: "Carries hydropower from Hydro-Québec under contracts with Massachusetts utilities. Began operating Jan 16, 2026, but Québec cut flows during a January cold snap to cover its own demand.",
+    where: "A power line from the Québec border to Lewiston, Maine",
+    note: "Carries Hydro-Québec hydropower into New England. Began operating Jan 16, 2026. Flows stopped Jan 24 to 26 when Québec limited exports.",
     arrow: "↑",
     badgeLat: 42.85, badgeLng: -70.62,
     sources: [
       "https://www.eia.gov/todayinenergy/detail.php?id=67105",
-      "https://www.avangrid.com/w/avangrid-s-new-england-clean-energy-connect-project-is-complete-and-energized"
+      "https://en.wikipedia.org/wiki/New_England_Clean_Energy_Connect"
     ]
   }
 ];
