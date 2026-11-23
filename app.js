@@ -144,6 +144,51 @@ function updateLabels() {
 map.on("zoomend", updateLabels);
 updateLabels();
 
+// ---- Small solar by town (shaded) --------------------------------------
+// Systems under 1 MW (mostly rooftops) from MassCEC, by Massachusetts town.
+// Shaded by watts per resident so big and small towns compare fairly.
+
+const SOLAR_BINS = [50, 100, 200, 400];            // W per person
+const binOf = (w) => SOLAR_BINS.filter((b) => w >= b).length; // 0..4
+const BIN_OPACITY = [0.05, 0.13, 0.22, 0.32, 0.44];
+
+const townLayer = L.geoJSON(window.TOWNS || null, {
+  interactive: false,
+  style: (f) => ({
+    color: "#ffffff",
+    weight: 0.8,
+    fillColor: "#e0a100",
+    fillOpacity: f.properties.wattsPerPerson == null ? 0 : BIN_OPACITY[binOf(f.properties.wattsPerPerson)]
+  })
+});
+const townsOn = () => document.getElementById("town-toggle")?.checked !== false;
+function syncTownLayer() {
+  if (townsOn()) { townLayer.addTo(map); townLayer.bringToBack(); } else map.removeLayer(townLayer);
+}
+
+// Is a point inside a (multi)polygon? Ray casting on [lng, lat] rings.
+function inRing(x, y, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i], [xj, yj] = ring[j];
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+function inPolygon(x, y, rings) {
+  if (!inRing(x, y, rings[0])) return false;
+  for (let k = 1; k < rings.length; k++) if (inRing(x, y, rings[k])) return false; // holes
+  return true;
+}
+function townAt(latlng) {
+  for (const f of (window.TOWNS?.features || [])) {
+    const g = f.geometry;
+    const polys = g.type === "Polygon" ? [g.coordinates] : g.coordinates;
+    if (polys.some((rings) => inPolygon(latlng.lng, latlng.lat, rings))) return f.properties;
+  }
+  return null;
+}
+
 // ---- Energy sites -------------------------------------------------------
 
 // One color per source type. Storage (batteries) gets its own color because
@@ -172,10 +217,11 @@ function dotStyle(site, hot) {
   const retired = site.stage === "retired";
   return {
     radius: dotRadius(site.mw) + (hot ? 2 : 0),
-    color: hot ? "#111" : c,
-    weight: hot ? 2 : (retired ? 2.5 : 1.5),
+    // White outline keeps dots readable on top of the shaded towns.
+    color: hot ? "#111" : (proposed || retired ? c : "#ffffff"),
+    weight: hot ? 2 : (retired ? 2.5 : proposed ? 1.5 : 1),
     fillColor: retired ? "#bdbdbd" : c,
-    fillOpacity: proposed ? 0 : (hot ? 1 : 0.75),
+    fillOpacity: proposed ? 0 : (hot ? 1 : 0.9),
     dashArray: proposed ? "3 2" : null
   };
 }
@@ -212,6 +258,18 @@ document.getElementById("legend").innerHTML =
   `<span class="key"><i class="hollow"></i>Planned</span>` +
   `<span class="key"><i class="retired"></i>Shut down</span>`;
 
+document.getElementById("town-legend").innerHTML =
+  `<label class="toggle"><input type="checkbox" id="town-toggle" checked> Small solar by town</label>
+   <div class="ramp">${BIN_OPACITY.map((o, i) =>
+     `<span><i style="background:rgba(224,161,0,${o})"></i>${
+       i === 0 ? "<" + SOLAR_BINS[0] : i === SOLAR_BINS.length ? SOLAR_BINS.at(-1) + "+" : SOLAR_BINS[i - 1] + "–" + SOLAR_BINS[i]
+     }</span>`).join("")}<em>watts per person</em></div>`;
+document.getElementById("town-toggle").addEventListener("change", () => {
+  syncTownLayer();
+  if (lastLatLng && map.hasLayer(cursor)) update(lastLatLng);
+});
+syncTownLayer();
+
 // ---- Mouse circle -------------------------------------------------------
 
 const cursor = L.circleMarker(BOSTON, {
@@ -240,7 +298,7 @@ function update(latlng) {
     if (hit) inRange.push(m.site);
   }
   const outsideHit = outside.filter(({ src }) => near(src.badgeLat, src.badgeLng, 40)).map((o) => o.src);
-  renderPanel(inRange, outsideHit);
+  renderPanel(inRange, outsideHit, townsOn() ? townAt(latlng) : null);
 }
 
 const fmtMW = (mw) => (mw >= 10 ? Math.round(mw) : mw >= 1 ? mw.toFixed(1) : mw.toFixed(2)) + " MW";
@@ -253,12 +311,21 @@ function fmtWhen(s) {
 }
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
-function renderPanel(inRange, outsideHit = []) {
-  if (inRange.length === 0 && outsideHit.length === 0) {
+function renderPanel(inRange, outsideHit = [], town = null) {
+  if (inRange.length === 0 && outsideHit.length === 0 && !town) {
     nearbyEl.innerHTML = '<p class="empty">Nothing in range.</p>';
     return;
   }
   let html = "";
+
+  if (town) {
+    html += `<div class="town">
+      <div class="name">${esc(town.town)}</div>
+      <div class="meta">${town.systems.toLocaleString("en-US")} small solar systems · ${fmtMW(town.smallSolarMW)}
+        ${town.wattsPerPerson != null ? `· ${town.wattsPerPerson} W per person` : ""}</div>
+      <div class="note">${town.homeSystems.toLocaleString("en-US")} of them on homes. Under 1 MW each, as of Jan 2025.</div>
+    </div>`;
+  }
 
   for (const src of outsideHit) {
     html += `<div class="site outside">
